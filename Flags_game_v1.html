@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Flags Game</title>
+
+  </head>
+
+  <body>
+
+    <div id="score">0</div>
+    <canvas id="Gameboard" width="600" height="600"></canvas>
+
+    <style>
+      #Gameboard {
+        position: absolute;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      #score {
+      text-align: center;
+      font-size: 50px;
+      }
+    </style>
+  </body>
+
+  <script>
+    // board
+    const board_border = 'black';
+    const board_background = "white";
+    const canvas_height = 600;
+    const canvas_width = 600;
+
+    // flags
+    const RussianFlag_col1 = 'white';
+    const RussianFlag_col2 = 'blue';
+    const RussianFlag_col3 = 'red';
+
+    const SwissFlag_col = 'red';
+    const Cross_col = 'white';
+
+    const FlagBorder_col = 'black';
+
+
+    // flags position from top left
+    let RussianFlag = [
+      {x: 400, y: 400},
+      {x: 400, y: 415},
+      {x: 400, y: 430}
+    ]
+
+    let SwissFlag = [
+      {x: 50, y: 50},
+      {x: 60, y: 70},
+      {x: 70, y: 60}
+    ]
+
+
+    // scoring system, every points is a new kid
+    let score = "";
+    let names = ["Demian", "Matvey", "Odile", "Benedicte", "Charlotte"];
+    let kids = -1;
+
+    let changing_direction = false;
+
+    // flags speed
+    let SwissSpeed = 10;
+    let RussianSpeed = 10;
+
+    // Initial velocities (1: Swiss, 2: Russian)
+    let dx1 = 0;
+    let dy1 = 0;
+    let dx2 = 10;
+    let dy2 = 0;
+
+    // variables to keep enable movements decisions
+    let axis = true;
+    let direction = true;
+
+    // to allow recursions with count down not to randomize at every step from the flag
+    let NumSteps = 1;
+    let EscapeSteps = 0;
+    // to indicate for how long the direction should be kept at max (in case of escape)
+    let MaxSteadySteps = 5;
+    // to indicate for how long the direction should be kept in case of escape
+    let SteadyEscape = 5;
+    // Russian flag hitting the wall
+    let top_boarder = false;
+    let lower_boarder = false;
+    let left_boarder = false;
+    let right_boarder = false;
+    // from any wall
+    let boarder = false
+    // distance between flags center
+    let dx = 200.0;
+    let dy = 200.0;
+
+    // distance between flags
+    let distance = 301.0; // max 100
+    let limit = 200;
+    let meet = false;
+
+    // escape boolean
+    let escape_up = false;
+    let escape_down = false;
+    let escape_left = false;
+    let escape_right = false;
+
+    // distance from walls
+    let dist_top = 10.0;
+    let dist_bottom = 10.0;
+    let dist_left = 10.0;
+    let dist_right = 10.0;
+
+    document.addEventListener("keydown", change_direction);
+
+    // Get the canvas element
+    const Gameboard = document.getElementById("Gameboard");
+    // Return a two dimensional drawing context
+    const Gameboard_ctx = Gameboard.getContext("2d");
+    main();
+
+    // draw a border around the canvas
+    function clearCanvas() {
+      //  Select the colour to fill the drawing
+      Gameboard_ctx.fillStyle = board_background;
+      //  Select the colour for the border of the canvas
+      Gameboard_ctx.strokestyle = board_border;
+      // Draw a "filled" rectangle to cover the entire canvas
+      Gameboard_ctx.fillRect(0, 0, Gameboard.width, Gameboard.height);
+      // Draw a "border" around the entire canvas
+      Gameboard_ctx.strokeRect(0, 0, Gameboard.width, Gameboard.height);
+    }
+
+    // functions that draw flags
+    function drawRussianFlag() {
+
+      Gameboard_ctx.fillStyle = RussianFlag_col1;
+
+      Gameboard_ctx.fillRect(RussianFlag[0].x, RussianFlag[0].y, 60, 15);
+
+      Gameboard_ctx.fillStyle = RussianFlag_col2;
+
+      Gameboard_ctx.fillRect(RussianFlag[1].x, RussianFlag[1].y, 60, 15);
+
+      Gameboard_ctx.fillStyle = RussianFlag_col3;
+
+      Gameboard_ctx.fillRect(RussianFlag[2].x, RussianFlag[2].y, 60, 15);
+
+      Gameboard_ctx.strokestyle = FlagBorder_col;
+
+      // Draw a border around the flag
+      Gameboard_ctx.strokeRect(RussianFlag[0].x, RussianFlag[0].y, 60, 45);
+    }
+
+
+    function drawSwissFlag() {
+
+      Gameboard_ctx.fillStyle = SwissFlag_col;
+
+      Gameboard_ctx.fillRect(SwissFlag[0].x, SwissFlag[0].y, 50, 50);
+
+      Gameboard_ctx.fillStyle = Cross_col;
+
+      Gameboard_ctx.fillRect(SwissFlag[1].x, SwissFlag[1].y, 30, 10);
+
+      Gameboard_ctx.fillRect(SwissFlag[2].x, SwissFlag[2].y, 10, 30);
+
+      Gameboard_ctx.strokestyle = FlagBorder_col;
+
+      Gameboard_ctx.strokeRect(SwissFlag[0].x, SwissFlag[0].y, 50, 50);
+    }
+
+    // function to move the flags
+    function move_Swissflag() {
+      SwissFlag[0].x = SwissFlag[0].x + dx1;
+      SwissFlag[0].y = SwissFlag[0].y + dy1;
+      SwissFlag[1].x = SwissFlag[1].x + dx1;
+      SwissFlag[1].y = SwissFlag[1].y + dy1;
+      SwissFlag[2].x = SwissFlag[2].x + dx1;
+      SwissFlag[2].y = SwissFlag[2].y + dy1;
+    }
+
+    function move_Russianflag() {
+
+      RussianFlag[0].x = RussianFlag[0].x + dx2;
+      RussianFlag[0].y = RussianFlag[0].y + dy2;
+      RussianFlag[1].x = RussianFlag[1].x + dx2;
+      RussianFlag[1].y = RussianFlag[1].y + dy2;
+      RussianFlag[2].x = RussianFlag[2].x + dx2;
+      RussianFlag[2].y = RussianFlag[2].y + dy2;
+
+    }
+
+    // function to get random integer
+    function getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+
+
+    function clear_board() {
+          //  Select the colour to fill the drawing
+          Gameboard_ctx.fillStyle = board_background;
+          //  Select the colour for the border of the canvas
+          Gameboard_ctx.strokestyle = board_border;
+          // Draw a "filled" rectangle to cover the entire canvas
+          Gameboard_ctx.fillRect(0, 0, Gameboard.width, Gameboard.height);
+          // Draw a "border" around the entire canvas
+          Gameboard_ctx.strokeRect(0, 0, Gameboard.width, Gameboard.height);
+        }
+
+
+
+      function change_direction(event) {
+        const LEFT_KEY = 37;
+        const RIGHT_KEY = 39;
+        const UP_KEY = 38;
+        const DOWN_KEY = 40;
+
+      // Prevent the snake from reversing
+
+        if (changing_direction) return;
+        changing_direction = true;
+        const keyPressed = event.keyCode;
+        const goingUp = dy1 === - SwissSpeed;
+        const goingDown = dy1 === SwissSpeed;
+        const goingRight = dx1 === SwissSpeed;
+        const goingLeft = dx1 === -SwissSpeed;
+        if (keyPressed === LEFT_KEY && !goingRight) {
+          dx1 = - SwissSpeed;
+          dy1 = 0;
+        }
+        if (keyPressed === UP_KEY && !goingDown) {
+          dx1 = 0;
+          dy1 = - SwissSpeed;
+        }
+        if (keyPressed === RIGHT_KEY && !goingLeft) {
+          dx1 = SwissSpeed;
+          dy1 = 0;
+        }
+        if (keyPressed === DOWN_KEY && !goingUp) {
+          dx1 = 0;
+          dy1 = SwissSpeed;
+        }
+      }
+
+    function main() {
+        changing_direction = false;
+        setTimeout(function onTick() {
+        clear_board();
+        // calculate distance between flags from center
+        // if dx is negative RussianFlag on the right
+        dx =  SwissFlag[0].x + 25 - RussianFlag[1].x + 30
+        // if dy is negative RussianFlag below
+        dy =  SwissFlag[0].y + 25 - RussianFlag[1].y + 7.5
+        // calculate distance with pythagore's theorem
+        distance = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
+
+        // Have the flags met?
+        meet =  (SwissFlag[0].x + 25 < RussianFlag[0].x + 50 && SwissFlag[0].x + 25 > RussianFlag[0].x - 10) && (SwissFlag[0].y + 25 < RussianFlag[0].y + 55 && SwissFlag[0].y + 25 > RussianFlag[0].y - 10)
+
+        if (meet) {
+          // Get a kid name as point
+          kids += 1;
+          score = names[kids];
+          document.getElementById('score').innerHTML = score;
+          // restart from initial positions
+          RussianFlag = [
+           {x: 400, y: 400},
+           {x: 400, y: 415},
+           {x: 400, y: 430}
+          ]
+
+          SwissFlag = [
+           {x: 50, y: 50},
+           {x: 60, y: 70},
+           {x: 70, y: 60}
+          ]
+        }
+
+        // Distances from boarders
+        dist_top = RussianFlag[1].y;
+        dist_bottom = canvas_height - RussianFlag[1].y;
+        dist_left = RussianFlag[1].x;
+        dist_right = canvas_width - RussianFlag[1].x;
+        // hitting top
+        top_boarder = RussianFlag[0].y < 0
+        lower_boarder = RussianFlag[2].y + 50 > canvas_height
+        left_boarder = RussianFlag[0].x < 0
+        right_boarder = RussianFlag[0].x + 105 > canvas_width
+
+        // Boolean if need to escape from Swiss flag
+        escape_up = distance < limit && dy > 0 && Math.abs(dy) < Math.abs(dx)
+        escape_down = distance < limit && dy < 0 && Math.abs(dy) < Math.abs(dx)
+        escape_left = distance < limit && dx > 0 && Math.abs(dx) < Math.abs(dy)
+        escape_right = distance < limit && dx < 0 && Math.abs(dx) < Math.abs(dy)
+
+
+        // RussianFlag moves need some hierarchical decisions
+        // first case when the flag is both close to the Swiss flag and a wall
+        // second when the flag is both close a wall
+        // third when the flag is both close the SwissFlag
+
+        boarder = top_boarder||lower_boarder||left_boarder||right_boarder;
+
+        if (boarder && distance < limit && EscapeSteps < 0) {
+
+          if ((top_boarder || lower_boarder) && dist_left > dist_right) {
+            dx2 = -RussianSpeed;
+            dy2 = 0;
+            EscapeSteps = SteadyEscape;
+          }
+
+          if ((top_boarder || lower_boarder) && dist_left < dist_right) {
+            dx2 = RussianSpeed;
+            dy2 = 0;
+            EscapeSteps = SteadyEscape;
+          }
+
+          if ((right_boarder || left_boarder) && dist_bottom > dist_top) {
+            dx2 = 0;
+            dy2 = RussianSpeed;
+            EscapeSteps = SteadyEscape;
+          }
+
+          if ((right_boarder || left_boarder) && dist_bottom < dist_top) {
+            dx2 = 0;
+            dy2 = -RussianSpeed;
+            EscapeSteps = SteadyEscape;
+          }
+        } else if (top_boarder||lower_boarder||left_boarder||right_boarder) {
+          if (top_boarder) {
+            dx2 = 0;
+            dy2 = RussianSpeed;
+          }
+
+          if (lower_boarder) {
+            dx2 = 0;
+            dy2 = -RussianSpeed;
+          }
+
+          if (left_boarder) {
+            dx2 = RussianSpeed;
+            dy2 = 0;
+          }
+
+          if (right_boarder) {
+            dx2 = -RussianSpeed;
+            dy2 = 0;
+          }
+        } else if (distance < limit) {
+          if (escape_down) {
+            dx2 = 0;
+            dy2 = RussianSpeed;
+          }
+
+          if (escape_up) {
+            dx2 = 0;
+            dy2 = -RussianSpeed;
+          }
+
+          if (escape_right) {
+            dx2 = RussianSpeed;
+            dy2 = 0;
+          }
+
+          if (escape_left) {
+            dx2 = -RussianSpeed;
+            dy2 = 0;
+          }
+        } else if (NumSteps < 0) {
+          NumSteps = getRandomInt(1, MaxSteadySteps);
+          axis = Math.random() < 0.5;
+          direction = Math.random() < 0.5;
+
+          if (axis && direction) {
+            dx2 = -RussianSpeed;
+            dy2 = 0;
+          }
+          if (axis && !direction) {
+            dx2 = 0;
+            dy2 = -RussianSpeed;
+          }
+          if (!axis && direction) {
+            dx2 = RussianSpeed;
+            dy2 = 0;
+          }
+          if (!axis && !direction) {
+            dx2 = 0;
+            dy2 = RussianSpeed;
+          }
+
+        }
+
+        NumSteps--;
+        EscapeSteps--;
+        move_Russianflag();
+        drawRussianFlag();
+        move_Swissflag();
+        drawSwissFlag();
+        // Call main again
+        main();
+      }, 100)
+      }
+
+
+
+  </script>
+</html>
